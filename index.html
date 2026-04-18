@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NPDA Visual Simulator</title>
+    <!-- Modern Typography: Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="bg-layer"></div>
+    
+    <header class="glass-panel no-print">
+        <div class="header-content">
+            <h1>NPDA Visual Simulator</h1>
+            <p>Explore Nondeterministic Pushdown Automata with real-time state transitions and stack operations.</p>
+        </div>
+        <div class="header-actions">
+            <button id="btn-theme-toggle" class="btn icon-btn" title="Toggle Theme (Default: Black/Orange)">🌓</button>
+            <button id="btn-export-pdf" class="btn icon-btn accent-glow" title="Export as PDF">📄 Export PDF</button>
+        </div>
+    </header>
+
+    <main class="app-container">
+        <!-- Controls Sidebar -->
+        <aside class="panel controls-panel glass-panel">
+            <h2>Configuration</h2>
+            
+            <div class="control-group">
+                <label for="language-select">Target Language</label>
+                <select id="language-select">
+                    <option value="anbn">aⁿbⁿ (n ≥ 0)</option>
+                    <option value="parentheses">Balanced Parentheses</option>
+                    <option value="palindrome">Palindrome (wwᴿ)</option>
+                    <option value="custom">Custom Framework</option>
+                </select>
+            </div>
+
+            <!-- Custom Framework UI (Hidden by default) -->
+            <div id="custom-def-panel" style="display: none; margin-bottom: 1rem; padding: 1rem; background: rgba(0,0,0,0.4); border: 1px solid var(--panel-border); border-radius: 8px;">
+                <h3 style="font-size:0.85rem; color:var(--accent-orange); margin-bottom: 0.5rem; border-bottom: 1px solid var(--panel-border); padding-bottom:0.2rem;">Define Custom PDA</h3>
+                <div class="control-group">
+                    <label>States (comma separated)</label>
+                    <input type="text" id="def-states" placeholder="e.g. q0, q1, q_acc">
+                </div>
+                <div class="control-group">
+                    <label>Start State</label>
+                    <input type="text" id="def-start" placeholder="e.g. q0">
+                </div>
+                <div class="control-group">
+                    <label>Final States</label>
+                    <input type="text" id="def-finals" placeholder="e.g. q_acc">
+                </div>
+                
+                <h4 style="font-size:0.8rem; color: #ccc; margin-top: 1rem; margin-bottom: 0.3rem;">Transitions</h4>
+                <div class="transition-headers rules-view" style="display:grid; grid-template-columns: 2fr 2fr 2fr 0.5fr 2fr 2fr; gap:2px; font-size:0.7rem; color:#888; text-align:center;">
+                    <span>From</span><span>R</span><span>Pop</span><span></span><span>To</span><span>Push</span>
+                </div>
+                <div id="transition-rules-container" class="custom-scrollbar" style="max-height:150px; overflow-y:auto; margin-bottom:0.5rem;">
+                    <!-- Rules injected dynamically -->
+                </div>
+                
+                <div style="display:flex; justify-content:space-between; gap:10px;">
+                    <button id="btn-add-rule" class="btn secondary-btn" style="flex:1; font-size:0.8rem;">+ Rule</button>
+                    <button id="btn-build-pda" class="btn primary-btn" style="flex:1; font-size:0.8rem;">Build Graph</button>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <label>Execution Mode</label>
+                <div class="toggle-switch">
+                    <input type="checkbox" id="mode-toggle">
+                    <label for="mode-toggle">
+                        <span class="mode-label det">Deterministic</span>
+                        <span class="mode-label nondet">Nondeterministic</span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <label for="input-string">Input String</label>
+                <input type="text" id="input-string" placeholder="e.g. aabb" autocomplete="off">
+            </div>
+
+            <div class="button-group">
+                <button id="btn-start" class="btn primary-btn">Start</button>
+                <button id="btn-step" class="btn secondary-btn" disabled>Step</button>
+                <button id="btn-run" class="btn secondary-btn" disabled>Auto-Run</button>
+                <button id="btn-reset" class="btn danger-btn">Reset</button>
+            </div>
+
+            <div class="control-group">
+                <label for="speed-slider">Animation Speed</label>
+                <input type="range" id="speed-slider" min="100" max="2000" value="800" dir="rtl">
+            </div>
+
+            <div id="status-display" class="status-banner">
+                <span id="status-text">Ready</span>
+            </div>
+        </aside>
+
+        <!-- Main Visualization Area -->
+        <section class="panel visual-panel glass-panel">
+            <h2 class="sr-only">State Diagram</h2>
+            <div class="canvas-container">
+                <svg id="pda-canvas" width="100%" height="100%">
+                    <defs>
+                        <!-- Arrowhead marker for transitions -->
+                        <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                            <path d="M 0 0 L 10 5 L 0 10 z" fill="#888888" />
+                        </marker>
+                        <marker id="arrow-active" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                            <path d="M 0 0 L 10 5 L 0 10 z" fill="#ff6a00" />
+                        </marker>
+                        <!-- Glow filter -->
+                        <filter id="glow-orange" x="-20%" y="-20%" width="140%" height="140%">
+                            <feGaussianBlur stdDeviation="5" result="blur" />
+                            <feComponentTransfer><feFuncA type="linear" slope="1.5"/></feComponentTransfer>
+                            <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+                        </filter>
+                    </defs>
+                    <g id="transitions-layer"></g>
+                    <g id="states-layer"></g>
+                    <g id="labels-layer"></g>
+                </svg>
+            </div>
+            
+            <div class="theoretical-def">
+                <h3>Formal Definition (δ)</h3>
+                <pre id="formal-def-content">Select a language to see transitions...</pre>
+            </div>
+        </section>
+
+        <!-- Stack and Trace Sidebar -->
+        <aside class="right-sidebar">
+            <div class="panel stack-panel glass-panel">
+                <h2>Stack</h2>
+                <div class="stack-wrapper">
+                    <div id="stack-container">
+                        <!-- Stack items will be dynamically inserted here -->
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel trace-panel glass-panel">
+                <h2>Execution Tree</h2>
+                <div id="trace-log" class="custom-scrollbar">
+                    <div class="trace-empty">No active simulation.</div>
+                </div>
+            </div>
+        </aside>
+    </main>
+
+    <!-- Template for Custom Rules -->
+    <template id="rule-row-template">
+        <div class="rule-row" style="display:grid; grid-template-columns: 2fr 2fr 2fr 0.5fr 2fr 2fr auto; gap:2px; margin-bottom:4px; align-items:center;">
+            <input type="text" placeholder="q0" style="padding:0.2rem; font-size:0.75rem;">
+            <input type="text" placeholder="a" style="padding:0.2rem; font-size:0.75rem; color:var(--accent-orange);">
+            <input type="text" placeholder="Z" style="padding:0.2rem; font-size:0.75rem;">
+            <span style="font-size:0.7rem; color:#888;">→</span>
+            <input type="text" placeholder="q1" style="padding:0.2rem; font-size:0.75rem;">
+            <input type="text" placeholder="A" style="padding:0.2rem; font-size:0.75rem; color:var(--accent-green);">
+            <button class="btn r-delete" style="padding:0.1rem 0.3rem; background:none; border:none; color:var(--accent-red); cursor:pointer;">X</button>
+        </div>
+    </template>
+
+    <script src="script.js"></script>
+</body>
+</html>
